@@ -19,6 +19,7 @@ import tplList from './list.html';
 
 import * as tool from '../lib/tool.js';
 import $ from '../lib/query.js';
+import './storage.less';
 
 class VConsoleStorageTab extends VConsolePlugin {
 
@@ -49,7 +50,7 @@ class VConsoleStorageTab extends VConsolePlugin {
           type: types[i].toLowerCase()
         },
         className: '',
-        onClick: function() {
+        onClick: function () {
           if (!$.hasClass(this, 'vc-actived')) {
             that.currentType = this.dataset.type;
             that.renderStorage();
@@ -68,13 +69,13 @@ class VConsoleStorageTab extends VConsolePlugin {
     let toolList = [{
       name: 'Refresh',
       global: false,
-      onClick: function(e) {
+      onClick: function (e) {
         that.renderStorage();
       }
     }, {
       name: 'Clear',
       global: false,
-      onClick: function(e) {
+      onClick: function (e) {
         that.clearLog();
       }
     }];
@@ -83,6 +84,7 @@ class VConsoleStorageTab extends VConsolePlugin {
 
   onReady() {
     // do nothing
+    this.enableEditingStorage()
   }
 
   onShow() {
@@ -134,16 +136,114 @@ class VConsoleStorageTab extends VConsolePlugin {
     }
 
     let $log = $.one('.vc-log', this.$tabbox);
-    if (list.length == 0) {
-      $log.innerHTML = '';
-    } else {
+    if (list.length) {
       // html encode for rendering
-      for (let i=0; i<list.length; i++) {
+      for (let i = 0; i < list.length; i++) {
         list[i].name = tool.htmlEncode(list[i].name);
         list[i].value = tool.htmlEncode(list[i].value);
       }
-      $log.innerHTML = $.render(tplList, {list: list}, true);
     }
+
+    $log.innerHTML = $.render(tplList, { list }, true);
+    this._currentType = this.currentType;
+  }
+
+  enableEditingStorage() {
+    const $log = $.one('.vc-log', this.$tabbox);
+    const o = this;
+
+    const deleteStorage = function (e) {
+      e.stopPropagation()
+
+      const $el = e.target.parentNode;
+      const name = $el.dataset.name;
+      const currentType = o._currentType;
+
+      if (name) {
+        switch (currentType) {
+          case 'cookies':
+            setCookie(name, '', -1)
+            break;
+          case 'localstorage':
+            delete localStorage[name]
+            break;
+          case 'sessionstorage':
+            delete sessionStorage[name]
+            break;
+          default:
+            return false;
+        }
+      }
+
+      $el.remove();
+    }
+
+    const editStorage = function (e) {
+      e.stopPropagation()
+
+      const name = e.target.parentNode.parentNode.dataset.name;
+      const $input = e.target;
+      const currentType = o._currentType;
+
+      $input.oninput = function () {
+        if (!name) {
+          alert('type name first')
+          this.value = ''
+          return
+        }
+
+        const value = $input.value.trim();
+        switch (currentType) {
+          case 'cookies':
+            setCookie(name, value)
+            break;
+          case 'localstorage':
+            localStorage[name] = value;
+            break;
+          case 'sessionstorage':
+            sessionStorage[name] = value;
+            break;
+          default:
+            return false;
+        }
+      }
+    }
+
+    const addStorage = function (e) {
+      e.stopPropagation()
+
+      const $rowList = $.one('.vc-table-rowlist', $log)
+      const $row = document.createElement('div')
+      $row.innerHTML = `
+          <dl class="vc-table-row">
+            <dd class="vc-table-col vc-key"><input type="text" placeholder="type name first"/></dd>
+            <dd class="vc-table-col vc-table-col-2 vc-value"><input type="text" placeholder="type name first" /></dd>
+            <dd class="vc-del vc-bn">X</dd>
+          </dl>
+        `;
+      if (!$rowList.innerHTML.trim().length) {
+        $rowList.innerHTML = `
+          <dl class="vc-table-row vc-table-header">
+            <dd class="vc-table-col">Name</dd>
+            <dd class="vc-table-col vc-table-col-2">Value</dd>
+            <dd class="vc-bn">X</dd>
+          </dl>
+        `
+      }
+      $rowList.appendChild($row)
+      requestAnimationFrame(() => {
+        const $input = $.one('input', $row);
+        $input.oninput = function () {
+          this.parentNode.parentNode.dataset.name = this.value.trim()
+        }
+        $input.focus()
+      })
+    }
+
+    $.delegate($log, 'click', '.vc-del', throttle(deleteStorage));
+    $.delegate($log, 'click', '.vc-value input', throttle(editStorage));
+    $.delegate($log, 'focusin', '.vc-value input', throttle(editStorage));
+    $.delegate($log, 'click', '.vc-add button', throttle(addStorage));
   }
 
   getCookieList() {
@@ -153,14 +253,14 @@ class VConsoleStorageTab extends VConsolePlugin {
 
     let list = [];
     let items = document.cookie.split(';');
-    for (let i=0; i<items.length; i++) {
+    for (let i = 0; i < items.length; i++) {
       let item = items[i].split('=');
       let name = item.shift().replace(/^ /, ''),
-          value = item.join('=');
+        value = item.join('=');
       try {
         name = decodeURIComponent(name);
         value = decodeURIComponent(value);
-      } catch(e) {
+      } catch (e) {
         console.log(e, name, value);
       }
       list.push({
@@ -180,7 +280,7 @@ class VConsoleStorageTab extends VConsolePlugin {
       let list = []
       for (var i = 0; i < localStorage.length; i++) {
         let name = localStorage.key(i),
-            value = localStorage.getItem(name);
+          value = localStorage.getItem(name);
         list.push({
           name: name,
           value: value
@@ -201,7 +301,7 @@ class VConsoleStorageTab extends VConsolePlugin {
       let list = []
       for (var i = 0; i < sessionStorage.length; i++) {
         let name = sessionStorage.key(i),
-            value = sessionStorage.getItem(name);
+          value = sessionStorage.getItem(name);
         list.push({
           name: name,
           value: value
@@ -219,7 +319,7 @@ class VConsoleStorageTab extends VConsolePlugin {
     }
     let hostname = window.location.hostname;
     let list = this.getCookieList();
-    for (var i=0; i<list.length; i++) {
+    for (var i = 0; i < list.length; i++) {
       let name = list[i].name;
       document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
@@ -250,5 +350,36 @@ class VConsoleStorageTab extends VConsolePlugin {
   }
 
 } // END Class
+
+function setCookie(cname, cvalue, exdays = 1) {
+  var d = new Date();
+  d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+  var expires = "expires=" + d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function throttle(fn, delay = 300, isImmediate = true) {
+  var flag = true;
+  if (isImmediate) {
+    return function () {
+      if (flag) {
+        fn.apply(this, arguments);
+        flag = false;
+        setTimeout(() => {
+          flag = true;
+        }, delay);
+      }
+    };
+  }
+  return function () {
+    if (flag == true) {
+      flag = false;
+      setTimeout(() => {
+        fn.apply(this, arguments);
+        flag = true;
+      }, delay);
+    }
+  };
+};
 
 export default VConsoleStorageTab;
