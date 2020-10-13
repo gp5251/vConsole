@@ -145,6 +145,10 @@ class VConsoleStorageTab extends VConsolePlugin {
     }
 
     $log.innerHTML = $.render(tplList, { list }, true);
+    $.all('.vc-value input', $log)
+      .forEach((input, i) => {
+        input.value = list[i].value
+      })
     this._currentType = this.currentType;
   }
 
